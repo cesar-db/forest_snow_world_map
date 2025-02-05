@@ -62,7 +62,7 @@
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
-        var url_to_geotiff_file = "https://github.com/cesar-db/forest_snow_world_map/tree/main/data/FSF_11km.tif";
+        var url_to_geotiff_file = "./data/FSF_11km.tif";
 
         fetch(url_to_geotiff_file)
           .then(response => response.arrayBuffer())
