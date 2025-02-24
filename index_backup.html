@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Fraction of Snowfall in Forest</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""/>
+  <style>
+    #map {
+      width: 100%;
+      height: 100vh;
+      background-color: grey;
+    }
+    .control-panel {
+      background: white;
+      padding: 10px;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 320px;
+      font-family: Arial, sans-serif;
+    }
+    .control-panel label {
+      display: block;
+      margin-bottom: 5px;
+    }
+    .control-panel input[type="checkbox"] {
+      margin-right: 5px;
+    }
+    #colorbar-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-top: 20px;
+    }
+    #colorbar {
+      width: 80%;
+      height: 15px;
+      background: linear-gradient(to right, #440154, #482777, #3f4a8a, #31678e, #2a8185, #35978f, #66b07b, #9cdf75, #d9f06b, #fde725);
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      position: relative;
+    }
+    #colorbar-label {
+      font-size: 12px;
+      color: #333;
+      background: white;
+      padding: 2px 5px;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+      text-align: center;
+      margin-top: 5px;
+      font-family: Arial, sans-serif;
+    }
+    #colorbar .tick {
+      position: absolute;
+      font-size: 12px;
+      color: #333;
+      white-space: nowrap;
+      transform: translate(-50%, -15px);
+      font-family: Arial, sans-serif;
+    }
+    #colorbar .tick:nth-child(1) {
+      left: 0%;
+    }
+    #colorbar .tick:nth-child(2) {
+      left: 50%;
+    }
+    #colorbar .tick:nth-child(3) {
+      left: 100%;
+    }
+    #value-display {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: white;
+      padding: 5px;
+      border-radius: 3px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      font-family: Arial, sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div class="control-panel">
+    <label>
+      <input type="checkbox" id="toggleFSFCheckbox" checked> Fraction of snowfall in forest (FSF)
+    </label>
+    <label>
+      Opacity: <input type="range" id="opacitySlider" min="0" max="1" step="0.1" value="0.7">
+    </label>
+    <div id="colorbar-container">
+      <div id="colorbar">
+        <div class="tick">0%</div>
+        <div class="tick">25%</div>
+        <div class="tick">50%</div>
+      </div>
+    </div>
+  </div>
+  <div id="value-display">FSF Value: </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""></script>
+  <script src="https://unpkg.com/georaster"></script>
+  <script src="https://unpkg.com/georaster-layer-for-leaflet/dist/georaster-layer-for-leaflet.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.1.0/chroma.min.js"></script>
+  <script src="https://unpkg.com/geoblaze@latest/dist/geoblaze.node.min.js"></script>
+  <script>
+    var map = L.map('map', {crs: L.CRS.EPSG3857}).setView([0., 0.], 2);
+
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    var fsfLayer;
+    var georaster;
+    var url_to_geotiff_file = './data/FSF_11km.tif';
+
+    var viridis = chroma.scale('viridis').domain([0, 50]);
+
+    fetch(url_to_geotiff_file)
+      .then(response => response.arrayBuffer())
+      .then(arrayBuffer => {
+        parseGeoraster(arrayBuffer).then(parsedGeoraster => {
+          georaster = parsedGeoraster;
+
+          function pixelValuesToColorFn(values) {
+            var value = values[0];
+            if (isNaN(value) || value < 1) {
+              return 'rgba(0, 0, 0, 0)'; // Completely transparent for NaN or values < 1
+            }
+
+            return viridis(value).hex();
+          }
+
+          var layer = new GeoRasterLayer({
+            georaster: georaster,
+            opacity: 0.7,
+            pixelValuesToColorFn: pixelValuesToColorFn,
+            resolution: 512
+          });
+
+          layer.addTo(map);
+          fsfLayer = layer;
+
+          // Set initial opacity
+          document.getElementById('opacitySlider').value = 0.7;
+
+          map.on('click', e => {
+            const latlng = [e.latlng.lat, e.latlng.lng];
+            const results = geoblaze.identify(georaster, latlng);
+            if (results && results.length > 0 && !isNaN(results[0])) {
+              document.getElementById('value-display').innerText = 'FSF Value: ' + results[0].toFixed(2);
+            } else {
+              document.getElementById('value-display').innerText = 'FSF Value: No Data';
+            }
+          });
+        });
+      });
+
+    var toggleFSFCheckbox = document.getElementById('toggleFSFCheckbox');
+    var opacitySlider = document.getElementById('opacitySlider');
+
+    toggleFSFCheckbox.addEventListener('change', function() {
+      if (toggleFSFCheckbox.checked) {
+        fsfLayer && fsfLayer.addTo(map);
+      } else {
+        map.removeLayer(fsfLayer);
+      }
+    });
+
+    opacitySlider.addEventListener('input', function () {
+      if (fsfLayer) fsfLayer.setOpacity(parseFloat(opacitySlider.value));
+    });
+  </script>
+</body>
+</html>
+

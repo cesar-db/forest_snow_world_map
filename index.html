@@ -7,6 +7,9 @@
     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
     crossorigin=""/>
   <style>
+    body, html {
+      font-family: Arial, sans-serif;
+    }
     #map {
       width: 100%;
       height: 100vh;
@@ -25,36 +28,49 @@
     }
     .control-panel label {
       display: block;
-      margin-bottom: 5px;
+      margin-bottom: 10px;
     }
     .control-panel input[type="checkbox"] {
       margin-right: 5px;
     }
+    .control-panel input[type="range"] {
+      display: block;
+      width: 60%;
+      margin: 10px auto;
+    }
+    #colorbar-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-top: 25px;
+      margin-bottom: 25px;
+    }
     #colorbar {
-      width: 50%;
-      height: 15px;
+      width: 60%;
+      height: 10px;
       background: linear-gradient(to right, #440154, #482777, #3f4a8a, #31678e, #2a8185, #35978f, #66b07b, #9cdf75, #d9f06b, #fde725);
       border: 1px solid #ccc;
       border-radius: 5px;
-      margin-top: 20px;
       position: relative;
     }
     #colorbar-label {
-      font-size: 12px;
+      font-size: 14px; /* Ajustez la taille de la police de la légende */
+      font-family: 'Arial', sans-serif; /* Ajustez la police de la légende */
       color: #333;
       background: white;
-      padding: 2px 5px;
+      padding: 5px;
       border-radius: 5px;
       box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
       text-align: center;
-      margin-top: 5px;
+      margin-top: 10px; /* Ajustez l'espacement au-dessus de la légende */
     }
     #colorbar .tick {
       position: absolute;
-      font-size: 12px;
+      font-size: 14px; /* Ajustez la taille de la police des ticks */
+      font-family: 'Arial', sans-serif; /* Ajustez la police des ticks */
       color: #333;
       white-space: nowrap;
-      transform: translate(-50%, -15px);
+      transform: translate(-50%, -20px); /* Ajustez la position verticale des ticks */
     }
     #colorbar .tick:nth-child(1) {
       left: 0%;
@@ -65,21 +81,51 @@
     #colorbar .tick:nth-child(3) {
       left: 100%;
     }
+    .legend-title {
+  font-size: 18px; /* Adjust the font size as needed */
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 10px; /* Adjust the margin as needed */
+}
   </style>
 </head>
 <body>
   <div id="map"></div>
   <div class="control-panel">
+     <h3 class="legend-title">Fraction of snowfall in forest (FSF)</h3>
+   
     <label>
-      <input type="checkbox" id="toggleFSFCheckbox" checked> Fraction of snowfall in forest (FSF)
+      <input type="checkbox" id="toggleFSFCheckbox" checked> Grid (0.1°)
     </label>
     <label>
-      Opacity: <input type="range" id="opacitySlider" min="0" max="1" step="0.1" value="0.7">
+      <input type="range" id="opacitySlider" min="0" max="1" step="0.1" value="1">
     </label>
-    <div id="colorbar">
-      <div class="tick">0%</div>
-      <div class="tick">25%</div>
-      <div class="tick">50%</div>
+    <div id="colorbar-container">
+      <div id="colorbar">
+        <div class="tick">0%</div>
+        <div class="tick">25%</div>
+        <div class="tick">50%</div>
+      </div>
+    </div>
+
+    <label>
+      <input type="checkbox" id="toggleGMBA"> Mountain ranges (GMBA)
+    </label>
+    <label>
+      <input type="range" id="opacitySliderGMBA" min="0" max="1" step="0.1" value="1">
+    </label>
+    <label>
+      <input type="checkbox" id="toggleHYBAS"> Hydrological basins (HYBAS)
+    </label>
+    <label>
+      <input type="range" id="opacitySliderHYBAS" min="0" max="1" step="0.1" value="1">
+    </label>
+    <div id="colorbar-container">
+      <div id="colorbar">
+        <div class="tick">0%</div>
+        <div class="tick">12.5%</div>
+        <div class="tick">25%</div>
+      </div>
     </div>
   </div>
 
@@ -92,17 +138,13 @@
   <script>
     var map = L.map('map', {crs: L.CRS.EPSG3857}).setView([0., 0.], 2);
 
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
     }).addTo(map);
-
-    var fsfLayer;
-    var georaster;
-    var url_to_geotiff_file = './data/FSF_11km.tif';
 
     var viridis = chroma.scale('viridis').domain([0, 50]);
 
-    fetch(url_to_geotiff_file)
+    fetch('./data/FSF_11km.tif')
       .then(response => response.arrayBuffer())
       .then(arrayBuffer => {
         parseGeoraster(arrayBuffer).then(parsedGeoraster => {
@@ -119,7 +161,7 @@
 
           var layer = new GeoRasterLayer({
             georaster: georaster,
-            opacity: 0.7,
+            opacity: 1,
             pixelValuesToColorFn: pixelValuesToColorFn,
             resolution: 512
           });
@@ -127,26 +169,146 @@
           layer.addTo(map);
           fsfLayer = layer;
 
-          // Set initial opacity
-          document.getElementById('opacitySlider').value = 0.7;
         });
       });
 
     var toggleFSFCheckbox = document.getElementById('toggleFSFCheckbox');
     var opacitySlider = document.getElementById('opacitySlider');
 
-    toggleFSFCheckbox.addEventListener('change', function() {
-      if (toggleFSFCheckbox.checked) {
-        fsfLayer && fsfLayer.addTo(map);
-      } else {
-        map.removeLayer(fsfLayer);
-      }
-    });
+    toggleFSFCheckbox.addEventListener('change', updateLayers);
 
     opacitySlider.addEventListener('input', function () {
       if (fsfLayer) fsfLayer.setOpacity(parseFloat(opacitySlider.value));
     });
+
+    var hybasLayer = L.geoJSON(null, {
+      style: function(feature) {
+        var fsf = feature.properties.FSF;
+        var color = chroma.scale('viridis').domain([1, 25])(fsf).hex();
+        return {
+          fillColor: color,
+          fillOpacity: fsf >= 1 ? 1 : 0,
+          color: 'black',
+          weight: 1,
+          opacity: 1
+        };
+      },
+      onEachFeature: function(feature, layer) {
+        layer.on('click', function() {
+          var properties = feature.properties;
+          var popupContent = '<div style="font-family: Arial, sans-serif;"><strong>HYBAS</strong><br>';
+          var displayNames = {
+            'FSF': 'FSF (%)',
+            'FSF_winter_spring': 'FSF winter-spring (%)',
+            'snowf_rel':'Snowfall fraction (%)',
+            'tree_cover':'Tree cover (%)',
+            'prec':'Precipitation (mm)',
+            'area':'Area (10⁶ km²)'
+          };
+          for (var key in properties) {
+            var displayName = displayNames[key] || key;
+            popupContent += '<strong>' + displayName + ':</strong> ' + properties[key] + '<br>';
+          }
+          popupContent += '</div>';
+          layer.bindPopup(popupContent).openPopup();
+        });
+      }
+    });
+
+    var gmbaLayer = L.geoJSON(null, {
+      style: function(feature) {
+        var fsf = feature.properties.FSF;
+        var color = chroma.scale('viridis').domain([1, 25])(fsf).hex();
+        return {
+          fillColor: color,
+          fillOpacity: fsf >= 1 ? 1 : 0,
+          color: 'black',
+          weight: 1,
+          opacity: 1
+        };
+      },
+      onEachFeature: function(feature, layer) {
+        layer.on('click', function() {
+          var properties = feature.properties;
+          var popupContent = '<div style="font-family: Arial, sans-serif;"><strong>GMBA</strong><br>';
+          var displayNames = {
+            'FSF': 'FSF (%)',
+            'FSF_winter_spring': 'FSF winter-spring (%)',
+            'snowf_rel':'Snowfall fraction (%)',
+            'tree_cover':'Tree cover (%)',
+            'prec':'Precipitation (mm)',
+            'area':'Area (10⁶ km²)'
+          };
+          for (var key in properties) {
+            var displayName = displayNames[key] || key;
+            popupContent += '<strong>' + displayName + ':</strong> ' + properties[key] + '<br>';
+          }
+          popupContent += '</div>';
+          layer.bindPopup(popupContent).openPopup();
+        });
+      }
+    });
+
+    fetch('./data/data_hybas.geojson')
+      .then(response => response.json())
+      .then(data => hybasLayer.addData(data));
+
+    document.getElementById('toggleHYBAS').addEventListener('change', updateLayers);
+
+    fetch('./data/data_gmba.geojson')
+      .then(response => response.json())
+      .then(data => gmbaLayer.addData(data));
+
+    document.getElementById('toggleGMBA').addEventListener('change', updateLayers);
+
+    document.getElementById('opacitySliderHYBAS').addEventListener('input', function() {
+      opacityHYBAS = parseFloat(this.value);
+      hybasLayer.setStyle(function(feature) {
+        var fsf = feature.properties.FSF;
+        var color = chroma.scale('viridis').domain([1, 25])(fsf).hex();
+        return {
+          fillColor: color,
+          fillOpacity: fsf >= 1 ? opacityHYBAS : 0,
+          color: 'black',
+          weight: 1,
+          opacity: 1
+        };
+      });
+    });
+
+    document.getElementById('opacitySliderGMBA').addEventListener('input', function() {
+      opacityGMBA = parseFloat(this.value);
+      gmbaLayer.setStyle(function(feature) {
+        var fsf = feature.properties.FSF;
+        var color = chroma.scale('viridis').domain([1, 25])(fsf).hex();
+        return {
+          fillColor: color,
+          fillOpacity: fsf >= 1 ? opacityGMBA : 0,
+          color: 'black',
+          weight: 1,
+          opacity: 1
+        };
+      });
+    });
+
+    function updateLayers() {
+      map.eachLayer(function (layer) {
+        if (layer !== fsfLayer && layer !== hybasLayer && layer !== gmbaLayer) {
+          return;
+        }
+        map.removeLayer(layer);
+      });
+
+      if (toggleFSFCheckbox.checked) {
+        fsfLayer && fsfLayer.addTo(map);
+      }
+      if (document.getElementById('toggleHYBAS').checked) {
+        hybasLayer.addTo(map);
+      }
+      if (document.getElementById('toggleGMBA').checked) {
+        gmbaLayer.addTo(map);
+      }
+    }
   </script>
 </body>
 </html>
-
